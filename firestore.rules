@@ -18,7 +18,7 @@
  * - /gates/{gateId}: A top-level collection for port gates, readable by all
  *   signed-in users and also writable by them.
  * - /access_logs/{accessLogId}: A top-level collection for system logs,
- *   readable by signed-in users and writable only by admins.
+ *   readable and writable by any signed-in user.
  * - /roles_admin/{userId}: A special collection where the existence of a
  *   document signifies that the user is an administrator.
  *
@@ -132,7 +132,7 @@ service cloud.firestore {
     }
 
     /**
-     * @description Manages access to system-wide access logs. Readable by any authenticated user, but only modifiable by admins.
+     * @description Manages access to system-wide access logs. Readable and writable by any authenticated user.
      * @path /access_logs/{accessLogId}
      * @allow An admin user can create a new access log entry. (create)
      * @deny A regular, non-admin user tries to delete an access log entry. (delete)
@@ -141,9 +141,9 @@ service cloud.firestore {
     match /access_logs/{accessLogId} {
       allow get: if isSignedIn();
       allow list: if isSignedIn();
-      allow create: if isAdmin();
-      allow update: if isAdmin() && resource != null;
-      allow delete: if isAdmin() && resource != null;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
     }
 
     /**
