@@ -45,7 +45,7 @@ interface ScheduleListProps {
 export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleListProps) {
   const [schedules, setSchedules] = React.useState<Schedule[]>(initialSchedules);
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [newScheduleDate, setNewScheduleDate] = React.useState<Date | undefined>(new Date());
+  const [newScheduleDate, setNewScheduleDate] = React.useState<Date | undefined>();
 
   const handleAddSchedule = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -76,7 +76,12 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
               Create and manage vehicle entry/exit schedules.
             </CardDescription>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={(open) => {
+            setIsDialogOpen(open);
+            if (open) {
+              setNewScheduleDate(new Date());
+            }
+          }}>
             <DialogTrigger asChild>
               <Button size="sm" className="gap-1">
                 <PlusCircle className="h-3.5 w-3.5" />

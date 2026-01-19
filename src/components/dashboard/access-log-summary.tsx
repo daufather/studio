@@ -25,12 +25,16 @@ import { getAccessLogSummary } from "@/app/actions";
 import { Skeleton } from "../ui/skeleton";
 
 export function AccessLogSummary() {
-  const [date, setDate] = React.useState<DateRange | undefined>({
-    from: new Date(new Date().setDate(new Date().getDate() - 7)),
-    to: new Date(),
-  });
+  const [date, setDate] = React.useState<DateRange | undefined>();
   const [summary, setSummary] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
+
+  React.useEffect(() => {
+    setDate({
+      from: new Date(new Date().setDate(new Date().getDate() - 7)),
+      to: new Date(),
+    });
+  }, []);
 
   const handleGenerateSummary = async () => {
     if (!date?.from || !date?.to) return;
@@ -108,7 +112,7 @@ export function AccessLogSummary() {
         )}
       </CardContent>
       <CardFooter>
-        <Button onClick={handleGenerateSummary} disabled={isLoading} className="w-full bg-primary hover:bg-primary/90">
+        <Button onClick={handleGenerateSummary} disabled={isLoading || !date} className="w-full bg-primary hover:bg-primary/90">
             {isLoading ? "Generating..." : "Generate Summary"}
         </Button>
       </CardFooter>
