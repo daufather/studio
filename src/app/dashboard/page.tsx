@@ -14,11 +14,11 @@ import {
   Activity,
   Loader2,
 } from "lucide-react";
-import { AccessLogs } from "@/components/dashboard/access-logs";
 import { AccessLogSummary } from "@/components/dashboard/access-log-summary";
 import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, orderBy, limit } from "firebase/firestore";
+import { collection, query, orderBy } from "firebase/firestore";
 import type { Gate, Vehicle, Schedule, AccessLog } from "@/lib/types";
+import { AccessTrendsChart } from '@/components/dashboard/access-trends-chart';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
@@ -35,12 +35,8 @@ export default function DashboardPage() {
 
   const logsQuery = useMemoFirebase(() => query(collection(firestore, 'access_logs'), orderBy('timestamp', 'desc')), [firestore]);
   const { data: accessLogs, isLoading: isLoadingLogs } = useCollection<AccessLog>(logsQuery);
-
-  const recentLogsQuery = useMemoFirebase(() => query(collection(firestore, 'access_logs'), orderBy('timestamp', 'desc'), limit(5)), [firestore]);
-  const { data: recentLogs, isLoading: isLoadingRecentLogs } = useCollection<AccessLog>(recentLogsQuery);
   
-
-  const isLoading = isLoadingGates || isLoadingVehicles || isLoadingSchedules || isLoadingLogs || isLoadingRecentLogs;
+  const isLoading = isLoadingGates || isLoadingVehicles || isLoadingSchedules || isLoadingLogs;
 
   if (isLoading) {
     return (
@@ -106,15 +102,7 @@ export default function DashboardPage() {
         </Card>
       </div>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="lg:col-span-4">
-          <CardHeader>
-            <CardTitle>Recent Access Logs</CardTitle>
-            <CardDescription>An overview of the most recent access events.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AccessLogs logs={recentLogs || []} gates={gates || []} vehicles={vehicles || []} />
-          </CardContent>
-        </Card>
+        <AccessTrendsChart logs={accessLogs || []} />
         <AccessLogSummary logs={accessLogs || []} gates={gates || []} vehicles={vehicles || []} />
       </div>
     </div>
