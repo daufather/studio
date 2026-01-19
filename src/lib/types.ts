@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export type Gate = {
   id: string;
   location: string;
@@ -16,7 +18,7 @@ export type Schedule = {
   id: string;
   vehicleId: string;
   gateId: string;
-  scheduledTime: Date;
+  scheduledTime: Timestamp;
   purpose: string;
 };
 
@@ -24,7 +26,7 @@ export type AccessLog = {
   id: string;
   vehicleId: string;
   gateId: string;
-  timestamp: Date;
+  timestamp: Timestamp;
   access: 'granted' | 'denied';
   reason?: string;
 };

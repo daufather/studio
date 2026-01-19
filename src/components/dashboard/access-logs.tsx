@@ -9,12 +9,22 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { AccessLog } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import React from "react";
 
 interface AccessLogsProps {
   logs: AccessLog[];
 }
 
 export function AccessLogs({ logs }: AccessLogsProps) {
+
+  const formattedLogs = React.useMemo(() => {
+    return logs.map(log => ({
+      ...log,
+      timestamp: log.timestamp.toDate(),
+    }))
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }, [logs]);
+
   return (
     <Table>
       <TableHeader>
@@ -26,7 +36,7 @@ export function AccessLogs({ logs }: AccessLogsProps) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {logs.map((log) => (
+        {formattedLogs.map((log) => (
           <TableRow key={log.id}>
             <TableCell className="font-medium">{log.vehicleId}</TableCell>
             <TableCell>{log.gateId}</TableCell>

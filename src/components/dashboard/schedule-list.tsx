@@ -2,6 +2,13 @@
 
 import * as React from "react";
 import {
+  collection,
+  doc,
+  Timestamp,
+} from "firebase/firestore";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import {
   Table,
   TableBody,
   TableCell,
@@ -32,39 +39,77 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Schedule, Vehicle, Gate } from "@/lib/types";
-import { PlusCircle, Calendar as CalendarIcon } from "lucide-react";
+import { PlusCircle, Calendar as CalendarIcon, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
-interface ScheduleListProps {
-  initialSchedules: Schedule[];
-  vehicles: Vehicle[];
-  gates: Gate[];
-}
+export function ScheduleList() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const { toast } = useToast();
 
-export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleListProps) {
-  const [schedules, setSchedules] = React.useState<Schedule[]>(initialSchedules);
+  const schedulesCollection = useMemoFirebase(
+    () => (user ? collection(firestore, "users", user.uid, "schedules") : null),
+    [firestore, user]
+  );
+  const { data: schedules, isLoading: isLoadingSchedules } = useCollection<Schedule>(schedulesCollection);
+
+  const vehiclesCollection = useMemoFirebase(
+    () => (user ? collection(firestore, "users", user.uid, "vehicles") : null),
+    [firestore, user]
+  );
+  const { data: vehicles, isLoading: isLoadingVehicles } = useCollection<Vehicle>(vehiclesCollection);
+
+  const gatesCollection = useMemoFirebase(() => collection(firestore, "gates"), [firestore]);
+  const { data: gates, isLoading: isLoadingGates } = useCollection<Gate>(gatesCollection);
+
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
-  const [newScheduleDate, setNewScheduleDate] = React.useState<Date | undefined>();
+  const [newScheduleDate, setNewScheduleDate] = React.useState<Date | undefined>(new Date());
 
   const handleAddSchedule = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!schedulesCollection) return;
+
     const form = event.currentTarget;
     const formData = new FormData(form);
 
-    const newSchedule: Schedule = {
-      id: `S-00${schedules.length + 1}`,
-      vehicleId: formData.get("vehicleId") as string,
-      gateId: formData.get("gateId") as string,
-      purpose: formData.get("purpose") as string,
-      scheduledTime: newScheduleDate!,
-    };
-    
-    if (newSchedule.vehicleId && newSchedule.gateId && newSchedule.purpose && newSchedule.scheduledTime) {
-      setSchedules(prev => [...prev, newSchedule].sort((a,b) => a.scheduledTime.getTime() - b.scheduledTime.getTime()));
+    const vehicleId = formData.get("vehicleId") as string;
+    const gateId = formData.get("gateId") as string;
+    const purpose = formData.get("purpose") as string;
+    const scheduledTime = newScheduleDate;
+
+    if (vehicleId && gateId && purpose && scheduledTime) {
+       const newScheduleRef = doc(schedulesCollection);
+       const newSchedule: Omit<Schedule, "id"> & { id?: string } = {
+        vehicleId,
+        gateId,
+        purpose,
+        scheduledTime: Timestamp.fromDate(scheduledTime),
+      };
+      
+      setDocumentNonBlocking(newScheduleRef, { ...newSchedule, id: newScheduleRef.id }, {});
+      toast({
+        title: "Schedule Created",
+        description: `Schedule for vehicle ${vehicles?.find(v => v.id === vehicleId)?.licensePlate} has been created.`,
+      });
       setIsDialogOpen(false);
+      form.reset();
+      setNewScheduleDate(new Date());
     }
   };
+
+  const isLoading = isLoadingSchedules || isLoadingVehicles || isLoadingGates;
+
+  // Convert Firestore Timestamps to Dates for displaying
+  const formattedSchedules = React.useMemo(() => {
+    return schedules
+      ?.map(s => ({
+        ...s,
+        scheduledTime: s.scheduledTime.toDate(),
+      }))
+      .sort((a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime());
+  }, [schedules]);
 
   return (
     <Card>
@@ -76,14 +121,9 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
               Create and manage vehicle entry/exit schedules.
             </CardDescription>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (open) {
-              setNewScheduleDate(new Date());
-            }
-          }}>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" disabled={!user}>
                 <PlusCircle className="h-3.5 w-3.5" />
                 Create Schedule
               </Button>
@@ -99,23 +139,23 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="vehicleId" className="text-right">Vehicle</Label>
-                    <Select name="vehicleId">
+                    <Select name="vehicleId" required>
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select a vehicle" />
                       </SelectTrigger>
                       <SelectContent>
-                        {vehicles.map(v => <SelectItem key={v.id} value={v.id}>{v.licensePlate} ({v.type})</SelectItem>)}
+                        {vehicles?.map(v => <SelectItem key={v.id} value={v.id}>{v.licensePlate} ({v.type})</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="gateId" className="text-right">Gate</Label>
-                    <Select name="gateId">
+                    <Select name="gateId" required>
                       <SelectTrigger className="col-span-3">
                         <SelectValue placeholder="Select a gate" />
                       </SelectTrigger>
                       <SelectContent>
-                        {gates.map(g => <SelectItem key={g.id} value={g.id}>{g.id} - {g.location}</SelectItem>)}
+                        {gates?.map(g => <SelectItem key={g.id} value={g.id}>{g.id} - {g.location}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -146,7 +186,7 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="purpose" className="text-right">Purpose</Label>
-                    <Input id="purpose" name="purpose" className="col-span-3" />
+                    <Input id="purpose" name="purpose" className="col-span-3" required/>
                   </div>
                 </div>
                 <DialogFooter>
@@ -158,6 +198,12 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
         </div>
       </CardHeader>
       <CardContent>
+        {isLoading && (
+            <div className="flex justify-center items-center py-10">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        )}
+        {!isLoading && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -168,9 +214,9 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
             </TableRow>
           </TableHeader>
           <TableBody>
-            {schedules.map((schedule) => (
+            {formattedSchedules?.map((schedule) => (
               <TableRow key={schedule.id}>
-                <TableCell className="font-medium">{vehicles.find(v => v.id === schedule.vehicleId)?.licensePlate}</TableCell>
+                <TableCell className="font-medium">{vehicles?.find(v => v.id === schedule.vehicleId)?.licensePlate}</TableCell>
                 <TableCell>{schedule.gateId}</TableCell>
                 <TableCell>{schedule.scheduledTime.toLocaleString()}</TableCell>
                 <TableCell>{schedule.purpose}</TableCell>
@@ -178,6 +224,7 @@ export function ScheduleList({ initialSchedules, vehicles, gates }: ScheduleList
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
   );

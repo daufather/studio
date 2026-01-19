@@ -2,6 +2,12 @@
 
 import * as React from "react";
 import {
+  collection,
+  doc,
+} from "firebase/firestore";
+import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { setDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import {
   Table,
   TableBody,
   TableCell,
@@ -31,7 +37,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Gate } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { PlusCircle, MoreHorizontal } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,36 +45,42 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
-interface GateListProps {
-  initialGates: Gate[];
-}
-
-export function GateList({ initialGates }: GateListProps) {
-  const [gates, setGates] = React.useState<Gate[]>(initialGates);
+export function GateList() {
+  const firestore = useFirestore();
+  const gatesCollection = useMemoFirebase(() => collection(firestore, "gates"), [firestore]);
+  const { data: gates, isLoading } = useCollection<Gate>(gatesCollection);
+  
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const { toast } = useToast();
 
-  const handleToggleStatus = (id: string) => {
-    setGates((prevGates) =>
-      prevGates.map((gate) =>
-        gate.id === id
-          ? { ...gate, status: gate.status === "open" ? "closed" : "open" }
-          : gate
-      )
-    );
+  const handleToggleStatus = (id: string, currentStatus: "open" | "closed") => {
+    const gateRef = doc(firestore, "gates", id);
+    const newStatus = currentStatus === "open" ? "closed" : "open";
+    updateDocumentNonBlocking(gateRef, { status: newStatus });
+    toast({
+      title: "Gate status updated",
+      description: `Gate ${id} is now ${newStatus}.`,
+    });
   };
 
   const handleAddGate = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
-    const id = formData.get("id") as string;
     const location = formData.get("location") as string;
     
-    if (id && location) {
-      const newGate: Gate = { id, location, status: "closed" };
-      setGates(prev => [...prev, newGate]);
+    if (location) {
+      const newGateRef = doc(gatesCollection);
+      const newGate: Gate = { id: newGateRef.id, location, status: "closed" };
+      setDocumentNonBlocking(newGateRef, newGate, {});
+      toast({
+        title: "Gate Added",
+        description: `Gate with location "${location}" has been added.`,
+      });
       setIsDialogOpen(false);
+      form.reset();
     }
   };
 
@@ -94,21 +106,15 @@ export function GateList({ initialGates }: GateListProps) {
                 <DialogHeader>
                   <DialogTitle>Add New Gate</DialogTitle>
                   <DialogDescription>
-                    Enter the details for the new gate.
+                    Enter the details for the new gate. The ID will be auto-generated.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="id" className="text-right">
-                      Gate ID
-                    </Label>
-                    <Input id="id" name="id" defaultValue={`G-00${gates.length + 1}`} className="col-span-3" />
-                  </div>
-                  <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="location" className="text-right">
                       Location
                     </Label>
-                    <Input id="location" name="location" placeholder="e.g., North Cargo Dock 2" className="col-span-3" />
+                    <Input id="location" name="location" placeholder="e.g., North Cargo Dock 2" className="col-span-3" required />
                   </div>
                 </div>
                 <DialogFooter>
@@ -120,6 +126,12 @@ export function GateList({ initialGates }: GateListProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {isLoading && (
+          <div className="flex justify-center items-center py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        {!isLoading && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -132,7 +144,7 @@ export function GateList({ initialGates }: GateListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {gates.map((gate) => (
+            {gates?.sort((a, b) => a.id.localeCompare(b.id)).map((gate) => (
               <TableRow key={gate.id}>
                 <TableCell className="font-medium">{gate.id}</TableCell>
                 <TableCell>{gate.location}</TableCell>
@@ -159,7 +171,7 @@ export function GateList({ initialGates }: GateListProps) {
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleToggleStatus(gate.id)}>
+                      <DropdownMenuItem onClick={() => handleToggleStatus(gate.id, gate.status)}>
                         Toggle Status
                       </DropdownMenuItem>
                       <DropdownMenuItem>Edit</DropdownMenuItem>
@@ -170,6 +182,7 @@ export function GateList({ initialGates }: GateListProps) {
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
   );

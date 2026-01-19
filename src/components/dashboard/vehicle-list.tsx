@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { collection, doc } from "firebase/firestore";
+import { useFirestore, useUser, useCollection, useMemoFirebase } from "@/firebase";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
 import {
   Table,
   TableBody,
@@ -29,32 +32,48 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { Vehicle } from "@/lib/types";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
-interface VehicleListProps {
-  initialVehicles: Vehicle[];
-}
-
-export function VehicleList({ initialVehicles }: VehicleListProps) {
-  const [vehicles, setVehicles] = React.useState<Vehicle[]>(initialVehicles);
+export function VehicleList() {
+  const firestore = useFirestore();
+  const { user } = useUser();
+  const vehiclesCollection = useMemoFirebase(
+    () => (user ? collection(firestore, "users", user.uid, "vehicles") : null),
+    [firestore, user]
+  );
+  const { data: vehicles, isLoading } = useCollection<Vehicle>(vehiclesCollection);
+  
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+  const { toast } = useToast();
 
   const handleAddVehicle = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!vehiclesCollection) return;
     const form = event.currentTarget;
     const formData = new FormData(form);
     
-    const newVehicle: Vehicle = {
-      id: `V-00${vehicles.length + 1}`,
-      licensePlate: formData.get("licensePlate") as string,
-      type: formData.get("type") as string,
-      owner: formData.get("owner") as string,
-      ownerEmail: formData.get("ownerEmail") as string,
-    };
-    
-    if (newVehicle.licensePlate && newVehicle.type && newVehicle.owner && newVehicle.ownerEmail) {
-      setVehicles(prev => [...prev, newVehicle]);
+    const licensePlate = formData.get("licensePlate") as string;
+    const type = formData.get("type") as string;
+    const owner = formData.get("owner") as string;
+    const ownerEmail = formData.get("ownerEmail") as string;
+
+    if (licensePlate && type && owner && ownerEmail) {
+      const newVehicleRef = doc(vehiclesCollection);
+      const newVehicle: Vehicle = {
+        id: newVehicleRef.id,
+        licensePlate,
+        type,
+        owner,
+        ownerEmail
+      };
+      setDocumentNonBlocking(newVehicleRef, newVehicle, {});
+      toast({
+        title: "Vehicle Added",
+        description: `Vehicle ${licensePlate} has been registered.`,
+      });
       setIsDialogOpen(false);
+      form.reset();
     }
   };
 
@@ -65,12 +84,12 @@ export function VehicleList({ initialVehicles }: VehicleListProps) {
           <div>
             <CardTitle className="font-headline">Vehicle Management</CardTitle>
             <CardDescription>
-              View, add, and manage registered vehicles.
+              View, add, and manage your registered vehicles.
             </CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="gap-1">
+              <Button size="sm" className="gap-1" disabled={!user}>
                 <PlusCircle className="h-3.5 w-3.5" />
                 Add Vehicle
               </Button>
@@ -86,19 +105,19 @@ export function VehicleList({ initialVehicles }: VehicleListProps) {
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="licensePlate" className="text-right">License Plate</Label>
-                    <Input id="licensePlate" name="licensePlate" className="col-span-3" />
+                    <Input id="licensePlate" name="licensePlate" className="col-span-3" required/>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="type" className="text-right">Type</Label>
-                    <Input id="type" name="type" className="col-span-3" />
+                    <Input id="type" name="type" className="col-span-3" required/>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="owner" className="text-right">Owner</Label>
-                    <Input id="owner" name="owner" className="col-span-3" />
+                    <Input id="owner" name="owner" className="col-span-3" defaultValue={user?.displayName || ''} required/>
                   </div>
                   <div className="grid grid-cols-4 items-center gap-4">
                     <Label htmlFor="ownerEmail" className="text-right">Owner Email</Label>
-                    <Input id="ownerEmail" name="ownerEmail" type="email" className="col-span-3" />
+                    <Input id="ownerEmail" name="ownerEmail" type="email" className="col-span-3" defaultValue={user?.email || ''} required/>
                   </div>
                 </div>
                 <DialogFooter>
@@ -110,6 +129,12 @@ export function VehicleList({ initialVehicles }: VehicleListProps) {
         </div>
       </CardHeader>
       <CardContent>
+        {isLoading && (
+          <div className="flex justify-center items-center py-10">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        )}
+        {!isLoading && (
         <Table>
           <TableHeader>
             <TableRow>
@@ -120,7 +145,7 @@ export function VehicleList({ initialVehicles }: VehicleListProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {vehicles.map((vehicle) => (
+            {vehicles?.map((vehicle) => (
               <TableRow key={vehicle.id}>
                 <TableCell className="font-medium">{vehicle.licensePlate}</TableCell>
                 <TableCell>{vehicle.type}</TableCell>
@@ -130,6 +155,7 @@ export function VehicleList({ initialVehicles }: VehicleListProps) {
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
   );
