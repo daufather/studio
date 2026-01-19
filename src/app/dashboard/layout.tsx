@@ -14,7 +14,6 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { AuthGuard } from "@/components/auth/auth-guard";
-import { SeedButton } from "@/components/dashboard/seed-button";
 
 export default function DashboardLayout({
   children,
@@ -46,7 +45,6 @@ export default function DashboardLayout({
                 className="w-full rounded-lg bg-secondary pl-8 md:w-[200px] lg:w-[320px]"
               />
             </div>
-            <SeedButton />
             <UserNav />
           </header>
           <main className="flex-1 p-4 sm:px-6 sm:py-0">{children}</main>
