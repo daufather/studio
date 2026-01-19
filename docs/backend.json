@@ -1,0 +1,247 @@
+{
+  "entities": {
+    "Gate": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Gate",
+      "type": "object",
+      "description": "Represents a gate in the port access control system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the gate entity."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the gate (open or closed).",
+          "format": "string"
+        },
+        "location": {
+          "type": "string",
+          "description": "The location or name of the gate."
+        }
+      },
+      "required": [
+        "id",
+        "status",
+        "location"
+      ]
+    },
+    "Vehicle": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Vehicle",
+      "type": "object",
+      "description": "Represents a vehicle authorized to access the port.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the vehicle entity."
+        },
+        "licensePlate": {
+          "type": "string",
+          "description": "The vehicle's license plate number."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of vehicle (e.g., truck, car)."
+        },
+        "ownerInformation": {
+          "type": "string",
+          "description": "Information about the vehicle's owner."
+        }
+      },
+      "required": [
+        "id",
+        "licensePlate",
+        "type",
+        "ownerInformation"
+      ]
+    },
+    "Schedule": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Schedule",
+      "type": "object",
+      "description": "Represents a schedule for vehicle entry/exit through a gate.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the schedule entity."
+        },
+        "vehicleId": {
+          "type": "string",
+          "description": "Reference to Vehicle. (Relationship: Vehicle 1:N Schedule)"
+        },
+        "gateId": {
+          "type": "string",
+          "description": "Reference to Gate. (Relationship: Gate 1:N Schedule)"
+        },
+        "dateTime": {
+          "type": "string",
+          "description": "The date and time of the scheduled entry/exit.",
+          "format": "date-time"
+        },
+        "purpose": {
+          "type": "string",
+          "description": "The purpose of the scheduled entry/exit."
+        }
+      },
+      "required": [
+        "id",
+        "vehicleId",
+        "gateId",
+        "dateTime",
+        "purpose"
+      ]
+    },
+    "AccessLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AccessLog",
+      "type": "object",
+      "description": "Represents a log of vehicle access attempts (successful or denied).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the access log entry."
+        },
+        "vehicleId": {
+          "type": "string",
+          "description": "Reference to Vehicle. (Relationship: Vehicle 1:N AccessLog)"
+        },
+        "gateId": {
+          "type": "string",
+          "description": "Reference to Gate. (Relationship: Gate 1:N AccessLog)"
+        },
+        "dateTime": {
+          "type": "string",
+          "description": "The date and time of the access attempt.",
+          "format": "date-time"
+        },
+        "isAuthorized": {
+          "type": "boolean",
+          "description": "Indicates whether the access attempt was authorized."
+        }
+      },
+      "required": [
+        "id",
+        "vehicleId",
+        "gateId",
+        "dateTime",
+        "isAuthorized"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "user",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Collection to store user profiles. User ID is used for path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/vehicles/{vehicleId}",
+        "definition": {
+          "entityName": "vehicle",
+          "schema": {
+            "$ref": "#/backend/entities/Vehicle"
+          },
+          "description": "Subcollection to store vehicles owned by a specific user. Path-based ownership is used. Includes denormalized user information (e.g., isAdmin) for authorization independence, if applicable.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user (owner)."
+            },
+            {
+              "name": "vehicleId",
+              "description": "The unique identifier for the vehicle."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/schedules/{scheduleId}",
+        "definition": {
+          "entityName": "schedule",
+          "schema": {
+            "$ref": "#/backend/entities/Schedule"
+          },
+          "description": "Subcollection to store schedules for vehicles owned by a specific user. Path-based ownership is used. Includes denormalized user information (e.g., isAdmin) for authorization independence, if applicable.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user (owner)."
+            },
+            {
+              "name": "scheduleId",
+              "description": "The unique identifier for the schedule."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/gates/{gateId}",
+        "definition": {
+          "entityName": "gate",
+          "schema": {
+            "$ref": "#/backend/entities/Gate"
+          },
+          "description": "Collection to store gate information.  Requires additional security rules to control access and modification.",
+          "params": [
+            {
+              "name": "gateId",
+              "description": "The unique identifier for the gate."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/access_logs/{accessLogId}",
+        "definition": {
+          "entityName": "accessLog",
+          "schema": {
+            "$ref": "#/backend/entities/AccessLog"
+          },
+          "description": "Collection to store access log entries.  Requires additional security rules to control access and modification.",
+          "params": [
+            {
+              "name": "accessLogId",
+              "description": "The unique identifier for the access log entry."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "role",
+          "schema": {
+            "$ref": "#/backend/entities/Role"
+          },
+          "description": "Collection to store admin roles. The existence of a document grants admin privileges. Authorization Independence: Rules only check for the existence of the document, not its contents.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the admin user."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to support the \"Port Authority\" application, focusing on gate, vehicle, and schedule management, along with access control and logging. Authorization Independence is achieved primarily through path-based ownership for user-related data and the denormalization of admin roles. \n\nSpecifically, the `/users/{userId}` path establishes clear ownership.  For admin roles, the existence of a document in the `/roles_admin/{userId}` collection grants admin privileges. This avoids the need for complex `get()` calls in security rules, which increases robustness and simplifies debugging. To support QAPs, each collection is designed to have a homogenous security posture. For instance, the `schedules` collection does not mix schedules with different access requirements.\n\nThe structure also facilitates secure list operations.  For user-owned data (vehicles, schedules), listing is inherently secured by the path-based ownership (`/users/{userId}/vehicles/{vehicleId}`).  Global collections like `gates` require additional rules to prevent unauthorized listing/access, which will be handled at rules level. The use of explicit state modeling (e.g., `status` field in gates) enhances data clarity and supports predictable querying and security rule implementation."
+  }
+}

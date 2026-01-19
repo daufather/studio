@@ -1,0 +1,164 @@
+/**
+ * This ruleset enforces a security model for a Port Authority application,
+ * separating globally managed data (like gates and access logs) from
+ * user-specific data (like vehicles and schedules).
+ *
+ * Core Philosophy:
+ * The security model is dual-pronged:
+ * 1. User-Ownership: Data that belongs to a specific user (their vehicles,
+ *    their schedules) is secured using path-based rules. Only the authenticated
+ *    owner of that data can read or write to it.
+ * 2. Role-Based Access Control (RBAC): Global administrative data is managed
+ *    by users with an 'admin' role. A user's admin status is determined by the
+ *    existence of a document in the `/roles_admin/{userId}` collection.
+ *
+ * Data Structure:
+ * - /users/{userId}/...: All user-specific data is nested under this path,
+ *   creating a secure sandbox for each user.
+ * - /gates/{gateId}: A top-level collection for port gates, readable by all
+ *   signed-in users but writable only by admins.
+ * - /access_logs/{accessLogId}: A top-level collection for system logs,
+ *   readable by signed-in users and writable only by admins.
+ * - /roles_admin/{userId}: A special collection where the existence of a
+ *   document signifies that the user is an administrator.
+ *
+ * Key Security Decisions:
+ * - Default Deny: All paths are closed by default.
+ * - Admin Privilege Check: The `isAdmin()` function provides a performant way to
+ *   check for admin roles by looking for a document in `/roles_admin`, avoiding
+ *   costly `get()` calls in most rules.
+ * - No User Listing: It is not possible to list all users in the `/users`
+ *   collection, protecting user privacy.
+ * - Signed-In Reads for Global Data: To allow the application to function
+ *   (e.g., show a list of gates to a user), global collections are readable
+ *   by any authenticated user, but modifications are strictly limited to admins.
+ *
+ * Denormalization for Authorization:
+ * The primary example of denormalization is the `/roles_admin` collection. Instead
+ * of storing a role field on a user's profile (which would require a `get()`
+ * call to check), we use a separate collection. An `exists()` check against this
+ * collection is highly performant and allows for secure, independent authorization
+ * decisions.
+ *
+ * Structural Segregation:
+ * The structure clearly separates private user data (e.g., `/users/{userId}/vehicles`)
+ * from shared, global data (e.g., `/gates`). This prevents accidental data leakage
+ * and simplifies the rules required for list operations.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for reusable logic
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Checks if the requesting user is the owner of the document via path UID.
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Checks for ownership on an existing document. Used for update/delete.
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    // Checks if the requesting user has an admin role document.
+    // This is a performant way to manage roles without `get` calls in rules.
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+
+    /**
+     * @description Controls access to a user's own profile document.
+     * @path /users/{userId}
+     * @allow A user (auth.uid='user123') creates their own profile at `/users/user123`. (create)
+     * @deny A user (auth.uid='user456') tries to read another user's profile at `/users/user123`. (get)
+     * @principle Restricts access to a user's own data tree.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secures vehicles, which are owned by a specific user.
+     * @path /users/{userId}/vehicles/{vehicleId}
+     * @allow The user (auth.uid='user123') can create a new vehicle document under their own path `/users/user123/vehicles/vehicle_abc`. (create)
+     * @deny An attacker (auth.uid='user456') cannot list vehicles for `/users/user123`. (list)
+     * @principle Enforces strict document ownership within a user's private data subcollection.
+     */
+    match /users/{userId}/vehicles/{vehicleId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Secures schedules, which are owned by a specific user.
+     * @path /users/{userId}/schedules/{scheduleId}
+     * @allow The user (auth.uid='user123') can delete their own schedule at `/users/user123/schedules/schedule_xyz`. (delete)
+     * @deny An attacker (auth.uid='user456') cannot update a schedule for `/users/user123`. (update)
+     * @principle Enforces strict document ownership within a user's private data subcollection.
+     */
+    match /users/{userId}/schedules/{scheduleId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages access to port gate information. Readable by any authenticated user, but only modifiable by admins.
+     * @path /gates/{gateId}
+     * @allow Any signed-in user can read the list of available gates. (list)
+     * @deny A regular, non-admin user tries to update the status of a gate. (update)
+     * @principle Implements Role-Based Access Control (RBAC) for managing shared, global resources.
+     */
+    match /gates/{gateId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Manages access to system-wide access logs. Readable by any authenticated user, but only modifiable by admins.
+     * @path /access_logs/{accessLogId}
+     * @allow An admin user can create a new access log entry. (create)
+     * @deny A regular, non-admin user tries to delete an access log entry. (delete)
+     * @principle Implements Role-Based Access Control (RBAC) for managing sensitive system data.
+     */
+    match /access_logs/{accessLogId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+
+    /**
+     * @description Manages the admin role collection itself. Only existing admins can view or modify this collection.
+     * @path /roles_admin/{userId}
+     * @allow An existing admin (auth.uid='admin1') can create a role document for another user at `/roles_admin/user123`, making them an admin. (create)
+     * @deny A non-admin user cannot list all the admins in the system. (list)
+     * @principle Secures the RBAC system itself, preventing unauthorized privilege escalation.
+     */
+    match /roles_admin/{userId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin() && resource != null;
+      allow delete: if isAdmin() && resource != null;
+    }
+  }
+}
