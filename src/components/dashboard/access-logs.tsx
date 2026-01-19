@@ -34,9 +34,11 @@ export function AccessLogs({ logs, gates = [], vehicles = [] }: AccessLogsProps)
   [vehicles]);
 
   const formattedLogs = React.useMemo(() => {
-    return logs.map(log => ({
-      ...log,
-      timestamp: log.timestamp.toDate(),
+    return logs
+      .filter(log => !!log.timestamp)
+      .map(log => ({
+        ...log,
+        timestamp: log.timestamp.toDate(),
     }))
     .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [logs]);
