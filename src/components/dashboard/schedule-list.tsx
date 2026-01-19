@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -155,7 +156,7 @@ export function ScheduleList() {
                         <SelectValue placeholder="Select a gate" />
                       </SelectTrigger>
                       <SelectContent>
-                        {gates?.map(g => <SelectItem key={g.id} value={g.id}>{g.id} - {g.location}</SelectItem>)}
+                        {gates?.map(g => <SelectItem key={g.id} value={g.id}>{g.location}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -217,7 +218,7 @@ export function ScheduleList() {
             {formattedSchedules?.map((schedule) => (
               <TableRow key={schedule.id}>
                 <TableCell className="font-medium">{vehicles?.find(v => v.id === schedule.vehicleId)?.licensePlate}</TableCell>
-                <TableCell>{schedule.gateId}</TableCell>
+                <TableCell>{gates?.find(g => g.id === schedule.gateId)?.location || schedule.gateId}</TableCell>
                 <TableCell>{schedule.scheduledTime.toLocaleString()}</TableCell>
                 <TableCell>{schedule.purpose}</TableCell>
               </TableRow>
