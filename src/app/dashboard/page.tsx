@@ -115,7 +115,7 @@ export default function DashboardPage() {
             <AccessLogs logs={recentLogs || []} />
           </CardContent>
         </Card>
-        <AccessLogSummary />
+        <AccessLogSummary logs={accessLogs || []} />
       </div>
     </div>
   );

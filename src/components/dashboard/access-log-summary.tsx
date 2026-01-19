@@ -23,8 +23,9 @@ import {
 } from "@/components/ui/card";
 import { getAccessLogSummary } from "@/app/actions";
 import { Skeleton } from "../ui/skeleton";
+import type { AccessLog } from "@/lib/types";
 
-export function AccessLogSummary() {
+export function AccessLogSummary({ logs }: { logs: AccessLog[] }) {
   const [date, setDate] = React.useState<DateRange | undefined>();
   const [summary, setSummary] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
@@ -40,9 +41,17 @@ export function AccessLogSummary() {
     if (!date?.from || !date?.to) return;
     setIsLoading(true);
     setSummary("");
+
+    const filteredLogs = logs.filter(log => {
+      const logDate = log.timestamp.toDate();
+      // Ensure date.from and date.to are valid dates before comparing
+      return date.from && date.to && logDate >= date.from && logDate <= date.to;
+    });
+
     const summaryText = await getAccessLogSummary({
       startTime: date.from.toISOString(),
       endTime: date.to.toISOString(),
+      logs: JSON.stringify(filteredLogs),
     });
     setSummary(summaryText);
     setIsLoading(false);

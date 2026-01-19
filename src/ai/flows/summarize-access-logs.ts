@@ -14,6 +14,7 @@ import {z} from 'genkit';
 const SummarizeAccessLogsInputSchema = z.object({
   startTime: z.string().describe('The start time for the logs summary (ISO format).'),
   endTime: z.string().describe('The end time for the logs summary (ISO format).'),
+  logs: z.string().describe('A JSON string of access logs to be summarized.'),
 });
 export type SummarizeAccessLogsInput = z.infer<typeof SummarizeAccessLogsInputSchema>;
 
@@ -30,12 +31,13 @@ const prompt = ai.definePrompt({
   name: 'summarizeAccessLogsPrompt',
   input: {schema: SummarizeAccessLogsInputSchema},
   output: {schema: SummarizeAccessLogsOutputSchema},
-  prompt: `You are an expert system administrator summarizing access logs.
+  prompt: `You are a port security analyst. Your task is to summarize vehicle access logs for the Port Authority. The logs are provided as a JSON string.
 
-  Generate a concise summary of the access logs between {{startTime}} and {{endTime}}.
-  Identify any unusual patterns or anomalies in the logs.
-  Focus on providing a high-level overview of the activity during this period.
-  `,
+Generate a concise summary based on the provided logs. Highlight key statistics like total access events, number of grants vs. denials, and identify any unusual patterns. For example, mention any vehicles with multiple denied access attempts or gates with unusually high activity.
+
+The access logs are between {{startTime}} and {{endTime}}.
+Here are the logs:
+{{{logs}}}`,
 });
 
 const summarizeAccessLogsFlow = ai.defineFlow(
