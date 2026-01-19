@@ -7,15 +7,25 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AccessLogs } from "@/components/dashboard/access-logs";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection } from "firebase/firestore";
-import type { AccessLog } from "@/lib/types";
+import type { AccessLog, Gate, Vehicle } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 
 export default function LogsPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
+
   const logsCollection = useMemoFirebase(() => collection(firestore, 'access_logs'), [firestore]);
-  const { data: logs, isLoading } = useCollection<AccessLog>(logsCollection);
+  const { data: logs, isLoading: isLoadingLogs } = useCollection<AccessLog>(logsCollection);
+  
+  const gatesCollection = useMemoFirebase(() => collection(firestore, 'gates'), [firestore]);
+  const { data: gates, isLoading: isLoadingGates } = useCollection<Gate>(gatesCollection);
+
+  const vehiclesCollection = useMemoFirebase(() => (user ? collection(firestore, 'users', user.uid, 'vehicles') : null), [firestore, user]);
+  const { data: vehicles, isLoading: isLoadingVehicles } = useCollection<Vehicle>(vehiclesCollection);
+
+  const isLoading = isLoadingLogs || isLoadingGates || isLoadingVehicles;
   
   return (
     <div className="container mx-auto py-10">
@@ -32,7 +42,7 @@ export default function LogsPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
-            <AccessLogs logs={logs || []} />
+            <AccessLogs logs={logs || []} gates={gates || []} vehicles={vehicles || []} />
           )}
         </CardContent>
       </Card>

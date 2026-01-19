@@ -7,15 +7,31 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import type { AccessLog } from "@/lib/types";
+import type { AccessLog, Gate, Vehicle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import React from "react";
 
 interface AccessLogsProps {
   logs: AccessLog[];
+  gates?: Gate[];
+  vehicles?: Vehicle[];
 }
 
-export function AccessLogs({ logs }: AccessLogsProps) {
+export function AccessLogs({ logs, gates = [], vehicles = [] }: AccessLogsProps) {
+
+  const gateMap = React.useMemo(() => 
+    gates.reduce((acc, gate) => {
+      acc[gate.id] = gate.location;
+      return acc;
+    }, {} as Record<string, string>), 
+  [gates]);
+
+  const vehicleMap = React.useMemo(() => 
+    vehicles.reduce((acc, vehicle) => {
+      acc[vehicle.id] = vehicle.licensePlate;
+      return acc;
+    }, {} as Record<string, string>),
+  [vehicles]);
 
   const formattedLogs = React.useMemo(() => {
     return logs.map(log => ({
@@ -29,8 +45,8 @@ export function AccessLogs({ logs }: AccessLogsProps) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Vehicle ID</TableHead>
-          <TableHead>Gate ID</TableHead>
+          <TableHead>Vehicle</TableHead>
+          <TableHead>Gate</TableHead>
           <TableHead className="hidden md:table-cell">Timestamp</TableHead>
           <TableHead className="text-right">Status</TableHead>
         </TableRow>
@@ -38,8 +54,8 @@ export function AccessLogs({ logs }: AccessLogsProps) {
       <TableBody>
         {formattedLogs.map((log) => (
           <TableRow key={log.id}>
-            <TableCell className="font-medium">{log.vehicleId}</TableCell>
-            <TableCell>{log.gateId}</TableCell>
+            <TableCell className="font-medium">{vehicleMap[log.vehicleId] || log.vehicleId}</TableCell>
+            <TableCell>{gateMap[log.gateId] || log.gateId}</TableCell>
             <TableCell className="hidden md:table-cell">
               {log.timestamp.toLocaleString()}
             </TableCell>

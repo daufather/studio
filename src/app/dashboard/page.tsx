@@ -112,10 +112,10 @@ export default function DashboardPage() {
             <CardDescription>An overview of the most recent access events.</CardDescription>
           </CardHeader>
           <CardContent>
-            <AccessLogs logs={recentLogs || []} />
+            <AccessLogs logs={recentLogs || []} gates={gates || []} vehicles={vehicles || []} />
           </CardContent>
         </Card>
-        <AccessLogSummary logs={accessLogs || []} />
+        <AccessLogSummary />
       </div>
     </div>
   );
