@@ -42,7 +42,8 @@ export function AccessLogSummary({ logs }: { logs: AccessLog[] }) {
     setIsLoading(true);
     setSummary("");
 
-    const filteredLogs = logs.filter(log => {
+    const filteredLogs = (logs || []).filter(log => {
+      if (!log.timestamp) return false;
       const logDate = log.timestamp.toDate();
       // Ensure date.from and date.to are valid dates before comparing
       return date.from && date.to && logDate >= date.from && logDate <= date.to;

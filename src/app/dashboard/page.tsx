@@ -115,7 +115,7 @@ export default function DashboardPage() {
             <AccessLogs logs={recentLogs || []} gates={gates || []} vehicles={vehicles || []} />
           </CardContent>
         </Card>
-        <AccessLogSummary />
+        <AccessLogSummary logs={accessLogs || []} />
       </div>
     </div>
   );
