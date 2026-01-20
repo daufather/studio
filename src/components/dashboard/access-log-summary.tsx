@@ -21,14 +21,15 @@ import {
   CardTitle,
   CardFooter
 } from "@/components/ui/card";
-import { getAccessLogSummary } from "@/app/actions";
 import { Skeleton } from "../ui/skeleton";
 import type { AccessLog, Gate, Vehicle } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 export function AccessLogSummary({ logs, gates, vehicles }: { logs: AccessLog[], gates: Gate[], vehicles: Vehicle[] }) {
   const [date, setDate] = React.useState<DateRange | undefined>();
   const [summary, setSummary] = React.useState<string>("");
   const [isLoading, setIsLoading] = React.useState<boolean>(false);
+  const { toast } = useToast();
 
   React.useEffect(() => {
     setDate({
@@ -42,39 +43,61 @@ export function AccessLogSummary({ logs, gates, vehicles }: { logs: AccessLog[],
     setIsLoading(true);
     setSummary("");
 
-    const gateMap = (gates || []).reduce((acc, gate) => {
-      acc[gate.id] = gate.location;
-      return acc;
-    }, {} as Record<string, string>);
+    try {
+      const gateMap = (gates || []).reduce((acc, gate) => {
+        acc[gate.id] = gate.location;
+        return acc;
+      }, {} as Record<string, string>);
 
-    const vehicleMap = (vehicles || []).reduce((acc, vehicle) => {
-      acc[vehicle.id] = vehicle.licensePlate;
-      return acc;
-    }, {} as Record<string, string>);
+      const vehicleMap = (vehicles || []).reduce((acc, vehicle) => {
+        acc[vehicle.id] = vehicle.licensePlate;
+        return acc;
+      }, {} as Record<string, string>);
 
+      const filteredLogs = (logs || [])
+        .filter(log => {
+          if (!log.timestamp) return false;
+          const logDate = log.timestamp.toDate();
+          return date.from && date.to && logDate >= date.from && logDate <= date.to;
+        })
+        .map(log => ({
+          gate: gateMap[log.gateId] || log.gateId,
+          vehicle: vehicleMap[log.vehicleId] || log.vehicleId,
+          timestamp: log.timestamp.toDate().toISOString(),
+          access: log.access,
+          reason: log.reason,
+        }));
 
-    const filteredLogs = (logs || [])
-      .filter(log => {
-        if (!log.timestamp) return false;
-        const logDate = log.timestamp.toDate();
-        // Ensure date.from and date.to are valid dates before comparing
-        return date.from && date.to && logDate >= date.from && logDate <= date.to;
-      })
-      .map(log => ({
-        gate: gateMap[log.gateId] || log.gateId,
-        vehicle: vehicleMap[log.vehicleId] || log.vehicleId,
-        timestamp: log.timestamp.toDate().toISOString(),
-        access: log.access,
-        reason: log.reason,
-      }));
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startTime: date.from.toISOString(),
+          endTime: date.to.toISOString(),
+          logs: JSON.stringify(filteredLogs),
+        }),
+      });
 
-    const summaryText = await getAccessLogSummary({
-      startTime: date.from.toISOString(),
-      endTime: date.to.toISOString(),
-      logs: JSON.stringify(filteredLogs),
-    });
-    setSummary(summaryText);
-    setIsLoading(false);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      setSummary(result.summary);
+
+    } catch (error: any) {
+      console.error("Error generating summary:", error);
+      toast({
+        variant: "destructive",
+        title: "Summary Generation Failed",
+        description: error.message || "An unexpected error occurred.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
