@@ -1,9 +1,10 @@
 import React from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Github } from "lucide-react";
 import { MainNav } from "@/components/dashboard/main-nav";
 import { UserNav } from "@/components/auth/user-nav";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { PortAuthorityLogo } from "@/components/icons";
 import {
   SidebarProvider,
@@ -45,6 +46,12 @@ export default function DashboardLayout({
                 className="w-full rounded-lg bg-secondary pl-8 md:w-[200px] lg:w-[320px]"
               />
             </div>
+            <Link href="https://github.com/google/firebase-studio" target="_blank" rel="noreferrer">
+              <Button variant="ghost" size="icon">
+                <Github className="h-4 w-4" />
+                <span className="sr-only">GitHub</span>
+              </Button>
+            </Link>
             <UserNav />
           </header>
           <main className="flex-1 p-4 sm:px-6 sm:py-0">{children}</main>
