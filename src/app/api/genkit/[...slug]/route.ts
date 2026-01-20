@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { genkitAPI } from '@genkit-ai/next';
+import { ai } from '@/ai/genkit';
 
-export async function GET() {
-  return NextResponse.json({ message: 'Genkit API route not configured' }, { status: 501 });
-}
+// Make sure to import all flows that you want to expose via the API.
+import '@/ai/flows/summarize-access-logs';
 
-export async function POST() {
-    return NextResponse.json({ message: 'Genkit API route not configured' }, { status: 501 });
-}
+export const { GET, POST } = genkitAPI({
+  ai,
+});
