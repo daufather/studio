@@ -85,7 +85,8 @@ export function AccessLogSummary({ logs, gates, vehicles }: { logs: AccessLog[],
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        const errorData = await response.text();
+        throw new Error(`API request failed with status ${response.status}: ${errorData}`);
       }
 
       const result: SummarizeAccessLogsOutput = await response.json();
